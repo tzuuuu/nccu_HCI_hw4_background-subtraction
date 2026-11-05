@@ -38,7 +38,7 @@ python app.py
 - `background_subtraction.py`：MOG2、ROI motion ratio 與連續影格觸發邏輯。
 - `experiment_runner.py`：Pilot、75 次實驗排程、逐次 CSV 記錄與證據截圖。
 - `analyze_results.py`：成功率、誤觸、漏觸、變化比例及觸發時間摘要。
-- `results/`、`pilot-data/`：執行後建立的實驗資料（CSV 不會由 Git 自動追蹤）。
+- `results/`、`pilot-data/`：執行後建立的實驗資料 CSV，可納入作業版本紀錄。
 - `screenshots/`：介面、前景遮罩及實驗條件截圖。
 - `REPORT_TEMPLATE.md`：作業報告架構與填寫提示。
 
