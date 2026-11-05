@@ -30,7 +30,7 @@
 | Z5 | Menu | 底部工具列第 3 格 |
 | Z6 | Settings | 底部工具列第 4 格 |
 
-每區的 `motion_ratio = changed_pixels / zone_area`，避免不同 ROI 面積造成絕對像素數不易比較。系統需連續 K 個影格超過門檻才觸發；預設 K = 3、Cooldown = 1 秒，並等待該區變化量降至釋放門檻後重新啟用。
+每區的 `motion_ratio = changed_pixels / zone_area`，避免不同 ROI 面積造成絕對像素數不易比較。系統需連續 K 個影格超過門檻才觸發；預設 K = 3、Cooldown = 1 秒，並等待該區變化量降至釋放門檻後重新啟用。正式實驗期間固定 K 與 Cooldown，Experiment 2 僅改變 motion ratio 門檻。
 
 **辨識限制：** HW4 只判斷 foreground change，不辨識變化物體是否為手。本作業未使用 MediaPipe Hands、Hand Landmark、Hand Center、Wrist、Skin Segmentation、YOLO 或其他 Hand Detection 技術。
 

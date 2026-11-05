@@ -40,7 +40,11 @@ class TouchlessReaderApp:
         self.trigger_observers: List[Callable[[str, float, float], None]] = []
         self.experiment_window = None
         self.threshold_locked = False
+        self.detector_settings_locked = False
         self.snapshot_observers: List[Callable[[MotionSnapshot], None]] = []
+        self.threshold_scale = None
+        self.consecutive_box = None
+        self.cooldown_box = None
         self._build_menu()
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.open_diagnostics()
@@ -108,19 +112,21 @@ class TouchlessReaderApp:
         controls.pack(fill="x", pady=(2, 0))
         ttk.Label(controls, text="Threshold (% motion ratio)").grid(row=0, column=0, sticky="w")
         self.threshold_value = tk.DoubleVar(value=self.detector.threshold * 100)
-        ttk.Scale(controls, from_=0.5, to=15.0, variable=self.threshold_value, command=self._on_threshold_change).grid(row=1, column=0, sticky="ew", padx=(0, 18))
+        self.threshold_scale = ttk.Scale(controls, from_=0.1, to=100.0, variable=self.threshold_value, command=self._on_threshold_change)
+        self.threshold_scale.grid(row=1, column=0, sticky="ew", padx=(0, 18))
         self.threshold_label_var = tk.StringVar(value="{:.1f}%".format(self.threshold_value.get()))
         ttk.Label(controls, textvariable=self.threshold_label_var, width=7).grid(row=1, column=1, sticky="w")
 
         ttk.Label(controls, text="Consecutive frames").grid(row=0, column=2, sticky="w", padx=(18, 0))
         self.consecutive_value = tk.IntVar(value=3)
-        consecutive_box = ttk.Spinbox(controls, from_=1, to=12, width=5, textvariable=self.consecutive_value, command=self._on_confirmation_change)
-        consecutive_box.grid(row=1, column=2, sticky="w", padx=(18, 6))
-        consecutive_box.bind("<FocusOut>", self._on_confirmation_change)
+        self.consecutive_box = ttk.Spinbox(controls, from_=1, to=12, width=5, textvariable=self.consecutive_value, command=self._on_confirmation_change)
+        self.consecutive_box.grid(row=1, column=2, sticky="w", padx=(18, 6))
+        self.consecutive_box.bind("<FocusOut>", self._on_confirmation_change)
 
         ttk.Label(controls, text="Cooldown (seconds)").grid(row=0, column=3, sticky="w", padx=(18, 0))
         self.cooldown_value = tk.DoubleVar(value=1.0)
-        ttk.Spinbox(controls, from_=0.0, to=5.0, increment=0.1, width=6, textvariable=self.cooldown_value, command=self._on_cooldown_change).grid(row=1, column=3, sticky="w", padx=(18, 6))
+        self.cooldown_box = ttk.Spinbox(controls, from_=0.0, to=5.0, increment=0.1, width=6, textvariable=self.cooldown_value, command=self._on_cooldown_change)
+        self.cooldown_box.grid(row=1, column=3, sticky="w", padx=(18, 6))
 
         actions = ttk.Frame(container)
         actions.pack(fill="x", pady=(12, 0))
@@ -142,18 +148,27 @@ class TouchlessReaderApp:
             self.threshold_value.set(self.detector.threshold * 100)
             self.threshold_label_var.set("{:.1f}%".format(self.detector.threshold * 100))
             return
-        threshold = max(0.001, min(0.95, self.threshold_value.get() / 100.0))
+        threshold = max(0.001, min(0.999, self.threshold_value.get() / 100.0))
         self.detector.configure(threshold=threshold)
         self.reader.set_threshold(threshold)
+        self.threshold_value.set(threshold * 100)
         self.threshold_label_var.set("{:.1f}%".format(threshold * 100))
         self._refresh_experiment_state()
 
     def set_experiment_threshold_lock(self, locked: bool) -> None:
         self.threshold_locked = locked
+        self.detector_settings_locked = locked
+        state = "disabled" if locked else "normal"
+        if self.threshold_scale is not None:
+            self.threshold_scale.configure(state=state)
+        if self.consecutive_box is not None:
+            self.consecutive_box.configure(state=state)
+        if self.cooldown_box is not None:
+            self.cooldown_box.configure(state=state)
 
     def apply_experiment_threshold(self, threshold: float, unlock: bool = False) -> None:
         if unlock:
-            self.threshold_locked = False
+            self.set_experiment_threshold_lock(False)
         self.detector.configure(threshold=threshold)
         self.reader.set_threshold(threshold)
         if hasattr(self, "threshold_value"):
@@ -162,12 +177,18 @@ class TouchlessReaderApp:
         self._refresh_experiment_state()
 
     def _on_confirmation_change(self, _event=None) -> None:
+        if self.detector_settings_locked:
+            self.consecutive_value.set(self.detector.consecutive_frames)
+            return
         try:
             self.detector.configure(consecutive_frames=max(1, int(self.consecutive_value.get())))
         except (ValueError, tk.TclError):
             return
 
     def _on_cooldown_change(self) -> None:
+        if self.detector_settings_locked:
+            self.cooldown_value.set(self.detector.cooldown_seconds)
+            return
         try:
             self.detector.configure(cooldown_seconds=max(0.0, float(self.cooldown_value.get())))
         except (ValueError, tk.TclError):

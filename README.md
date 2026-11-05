@@ -24,7 +24,7 @@ python app.py
 1. 確認閱讀器顯示 8 頁文件、相機診斷視窗顯示六個 Zone。MOG2 初次學習約需 1–2 秒；背景穩定後再操作。
 2. 從「Experiment → Open Experiment Runner」開啟實驗工具。先選 Pilot，在正常光線下做幾次日常幅度的操作，收集 motion ratio。
 3. 停止 Pilot，使用第 25、50、75 百分位數作為 Low、Medium、High 的建議值。檢視三個值並確認由低至高，再開始 Experiment 2。Experiment 1 和 3 使用開始流程時的固定門檻。
-4. 每次依 Experiment Runner 顯示的目標區開始操作。觸發後自動記錄；逾時會記為漏觸。Experiment 3 切換光線後，先按「Reset Background Model」，等待背景重新穩定，再開始該試驗。
+4. 每次依 Experiment Runner 顯示的目標區開始操作。觸發後自動記錄；逾時會記為漏觸。正式流程期間會固定連續影格數與冷卻時間，Experiment 2 只改變門檻。Experiment 3 切換光線後，先按「Reset Background Model」，等待背景重新穩定，再開始該試驗。
 5. 每筆正式試驗完成後會立即寫入獨立 CSV：`results/experiment1_*.csv`、`results/experiment2_*.csv`、`results/experiment3_*.csv`。Pilot 資料寫入 `pilot-data/pilot-motion-ratios.csv`。
 6. 完成實驗後執行 `python analyze_results.py`，或指定一個以上的實驗 CSV；需要另存摘要時加上 `--output results/summary.md`。
 
