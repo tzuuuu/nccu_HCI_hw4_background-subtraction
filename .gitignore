@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+results/*.csv
+results/*.json
+!results/.gitkeep
+pilot-data/*.csv
+!pilot-data/.gitkeep
