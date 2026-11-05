@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
 import tkinter as tk
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from document_pages import ensure_document_pages
@@ -37,7 +38,7 @@ class DocumentReaderUI:
         self.zoom = 100
         self.theme = "Light"
         self.last_command = "Ready"
-        self.camera_status = "Camera starting…"
+        self.camera_status = "Camera starting..."
         self.menu_state: Optional[str] = None
         self.motion_ratios: Dict[str, float] = {"Z1": 0.0, "Z2": 0.0, "Z3": 0.0, "Z4": 0.0, "Z5": 0.0, "Z6": 0.0}
         self.active_zone: Optional[str] = None
@@ -53,6 +54,7 @@ class DocumentReaderUI:
         self.canvas.bind("<Configure>", self._schedule_render)
         self.canvas.bind("<Button-1>", self._handle_click)
         self._photo: Optional[ImageTk.PhotoImage] = None
+        self._last_rendered_image: Optional[Image.Image] = None
         self._menu_hitboxes = []
         self._schedule_render()
 
@@ -77,6 +79,15 @@ class DocumentReaderUI:
         self.active_zone = active_zone
         self.triggered_zone = triggered_zone
         self._schedule_render()
+
+    def save_screenshot(self, directory: Optional[Path] = None) -> Path:
+        output_dir = directory or (Path(__file__).parent / "screenshots")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "reader-{}.png".format(datetime.now().strftime("%Y%m%d-%H%M%S"))
+        if self._last_rendered_image is None:
+            self._render()
+        self._last_rendered_image.save(output_path)
+        return output_path
 
     def execute_command(self, command: str, source: str = "Camera") -> bool:
         """Apply one of the six commands; return whether visible state changed."""
@@ -176,7 +187,7 @@ class DocumentReaderUI:
                 label_box = draw.textbbox((0, 0), label, font=label_font)
                 label_width = label_box[2] - label_box[0]
                 draw.text((center_x - label_width / 2, center_y), label, font=label_font, fill=(31, 41, 55, 220))
-                detail = "{}  ·  Motion {}".format(zone, ratio_text)
+                detail = "{}  |  Motion {}".format(zone, ratio_text)
                 detail_box = draw.textbbox((0, 0), detail, font=small_font)
                 draw.text((center_x - (detail_box[2] - detail_box[0]) / 2, center_y + 29), detail, font=small_font, fill=(71, 85, 105, 220))
             else:
@@ -198,7 +209,7 @@ class DocumentReaderUI:
         toolbar_color = (255, 255, 255, 235) if not dark else (15, 23, 42, 245)
         draw.rectangle((0, toolbar_y, width, height), fill=toolbar_color)
         draw.line((0, toolbar_y, width, toolbar_y), fill=(37, 99, 235, 150), width=3)
-        toolbar_labels = ("Zoom In  +", "Zoom Out  −", "Menu  ☰", "Settings  ⚙")
+        toolbar_labels = ("Zoom In  +", "Zoom Out  -", "Menu", "Settings")
         toolbar_font = self._font(max(15, int(width * 0.016)), True)
         for index, label in enumerate(toolbar_labels):
             x1 = int(index * width / 4)
@@ -211,12 +222,13 @@ class DocumentReaderUI:
 
         footer_y = max(toolbar_y + 2, height - 27)
         footer_font = self._font(max(10, int(width * 0.009)))
-        footer = "Last Command: {}     {}     Threshold: {:.1f}%".format(self.last_command, self.camera_status, self.threshold * 100)
+        footer = "Last Command: {}     |     {}     |     Threshold: {:.1f}%".format(self.last_command, self.camera_status, self.threshold * 100)
         draw.text((16, footer_y), footer, font=footer_font, fill="#475569" if not dark else "#cbd5e1")
 
         if self.menu_state:
             self._draw_popup(image, self.menu_state)
 
+        self._last_rendered_image = image.copy()
         self._photo = ImageTk.PhotoImage(image)
         self.canvas.delete("all")
         self.canvas.create_image(0, 0, image=self._photo, anchor="nw")
