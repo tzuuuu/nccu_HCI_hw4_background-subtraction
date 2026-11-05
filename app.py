@@ -1,8 +1,10 @@
 """Run the HW4 vision-based touchless document reader."""
 
 import argparse
+import re
 import time
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Callable, List, Optional
@@ -34,8 +36,11 @@ class TouchlessReaderApp:
         self.last_snapshot: Optional[MotionSnapshot] = None
         self.last_frame_bgr = None
         self.last_mask = None
+        self.saved_trigger_zones = set()
         self.trigger_observers: List[Callable[[str, float, float], None]] = []
         self.experiment_window = None
+        self.threshold_locked = False
+        self.snapshot_observers: List[Callable[[MotionSnapshot], None]] = []
         self._build_menu()
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.open_diagnostics()
@@ -59,6 +64,10 @@ class TouchlessReaderApp:
         reader_menu.add_command(label="Menu", command=lambda: self.reader.execute_command("menu", "Toolbar"))
         reader_menu.add_command(label="Settings", command=lambda: self.reader.execute_command("settings", "Toolbar"))
         menu_bar.add_cascade(label="Reader", menu=reader_menu)
+
+        experiment_menu = tk.Menu(menu_bar, tearoff=False)
+        experiment_menu.add_command(label="Open Experiment Runner", command=self.open_experiment_runner)
+        menu_bar.add_cascade(label="Experiment", menu=experiment_menu)
         self.root.config(menu=menu_bar)
 
     def open_diagnostics(self) -> None:
@@ -129,10 +138,27 @@ class TouchlessReaderApp:
         return "Camera unavailable · use Retry Camera and allow camera access"
 
     def _on_threshold_change(self, _value=None) -> None:
+        if self.threshold_locked:
+            self.threshold_value.set(self.detector.threshold * 100)
+            self.threshold_label_var.set("{:.1f}%".format(self.detector.threshold * 100))
+            return
         threshold = max(0.001, min(0.95, self.threshold_value.get() / 100.0))
         self.detector.configure(threshold=threshold)
         self.reader.set_threshold(threshold)
         self.threshold_label_var.set("{:.1f}%".format(threshold * 100))
+        self._refresh_experiment_state()
+
+    def set_experiment_threshold_lock(self, locked: bool) -> None:
+        self.threshold_locked = locked
+
+    def apply_experiment_threshold(self, threshold: float, unlock: bool = False) -> None:
+        if unlock:
+            self.threshold_locked = False
+        self.detector.configure(threshold=threshold)
+        self.reader.set_threshold(threshold)
+        if hasattr(self, "threshold_value"):
+            self.threshold_value.set(threshold * 100)
+            self.threshold_label_var.set("{:.1f}%".format(threshold * 100))
         self._refresh_experiment_state()
 
     def _on_confirmation_change(self, _event=None) -> None:
@@ -175,12 +201,18 @@ class TouchlessReaderApp:
             self.last_mask = snapshot.foreground_mask.copy()
             self.reader.set_camera_status(snapshot.status)
             self.reader.set_motion_feedback(snapshot.motion_ratios, snapshot.active_zone, snapshot.triggered_zone)
+            for observer in list(self.snapshot_observers):
+                observer(snapshot)
             if snapshot.triggered_zone:
                 command = COMMANDS[snapshot.triggered_zone]
-                self.reader.execute_command(command)
                 trigger_time = time.monotonic()
                 for observer in list(self.trigger_observers):
                     observer(snapshot.triggered_zone, snapshot.trigger_ratio, trigger_time)
+                self.reader.execute_command(command)
+                if snapshot.triggered_zone not in self.saved_trigger_zones:
+                    self.saved_trigger_zones.add(snapshot.triggered_zone)
+                    zone = snapshot.triggered_zone
+                    self.root.after(100, lambda selected_zone=zone: self.capture_evidence("trigger-{}".format(selected_zone), "Camera trigger: {} {}".format(selected_zone, COMMAND_LABELS[COMMANDS[selected_zone]])))
             if self.camera_status_var is not None and self.diagnostics is not None and self.diagnostics.winfo_exists():
                 ratios = "  ".join("{} {:.1f}%".format(zone, snapshot.motion_ratios[zone] * 100) for zone in ZONE_ORDER)
                 self.camera_status_var.set("{}  ·  Threshold {:.1f}%  ·  {}".format(snapshot.status, self.detector.threshold * 100, ratios))
@@ -225,6 +257,40 @@ class TouchlessReaderApp:
         path = self.reader.save_screenshot()
         self.reader.set_camera_status("Saved {}".format(path.name))
 
+    def capture_evidence(self, name: str, title: str = "Touchless Document Reader") -> Path:
+        """Save the reader, camera input, and mask together for the report."""
+        self.reader._render()
+        reader_image = self.reader._last_rendered_image.copy()
+        width, height = reader_image.size
+        preview_width = min(520, width // 2 - 24)
+        preview_height = int(preview_width * 0.75)
+        header_height = 54
+        output = Image.new("RGB", (width, height + header_height + preview_height + 18), "#f8fafc")
+        output.paste(reader_image, (0, 0))
+        draw = ImageDraw.Draw(output)
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 18)
+        except OSError:
+            font = ImageFont.load_default()
+        draw.text((16, height + 15), title, font=font, fill="#1e293b")
+        if self.last_frame_bgr is not None and self.last_mask is not None:
+            frame = cv2.cvtColor(self.last_frame_bgr, cv2.COLOR_BGR2RGB)
+            mask = cv2.cvtColor(self.last_mask, cv2.COLOR_GRAY2RGB)
+            camera_image = Image.fromarray(frame).resize((preview_width, preview_height), Image.Resampling.LANCZOS)
+            mask_image = Image.fromarray(mask).resize((preview_width, preview_height), Image.Resampling.LANCZOS)
+            y = height + header_height
+            output.paste(camera_image, (16, y))
+            output.paste(mask_image, (width - preview_width - 16, y))
+            draw.text((16, y - 22), "Camera Input", font=font, fill="#334155")
+            draw.text((width - preview_width - 16, y - 22), "Foreground Mask", font=font, fill="#334155")
+        output_dir = APP_DIR / "screenshots"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = re.sub(r"[^A-Za-z0-9_-]+", "-", name).strip("-")
+        path = output_dir / "{}-{}.png".format(safe_name, datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+        output.save(path)
+        self.reader.set_camera_status("Saved {}".format(path.name))
+        return path
+
     def _save_mask_screenshot(self) -> None:
         if self.last_snapshot is None:
             messagebox.showinfo("No camera frame", "等待攝影機取得畫面後再儲存遮罩截圖。", parent=self.root)
@@ -259,9 +325,17 @@ class TouchlessReaderApp:
         if callback not in self.trigger_observers:
             self.trigger_observers.append(callback)
 
+    def add_snapshot_observer(self, callback: Callable[[MotionSnapshot], None]) -> None:
+        if callback not in self.snapshot_observers:
+            self.snapshot_observers.append(callback)
+
     def remove_trigger_observer(self, callback: Callable[[str, float, float], None]) -> None:
         if callback in self.trigger_observers:
             self.trigger_observers.remove(callback)
+
+    def remove_snapshot_observer(self, callback: Callable[[MotionSnapshot], None]) -> None:
+        if callback in self.snapshot_observers:
+            self.snapshot_observers.remove(callback)
 
     def open_experiment_runner(self) -> None:
         from experiment_runner import ExperimentRunnerWindow
@@ -278,6 +352,8 @@ class TouchlessReaderApp:
 
     def close(self) -> None:
         try:
+            if self.experiment_window is not None:
+                self.experiment_window.close()
             self.detector.release()
         finally:
             self.root.destroy()

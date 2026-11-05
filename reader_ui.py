@@ -125,9 +125,8 @@ class DocumentReaderUI:
         return changed
 
     def _schedule_render(self, _event=None) -> None:
-        if self._render_after_id is not None:
-            self.root.after_cancel(self._render_after_id)
-        self._render_after_id = self.root.after(35, self._render)
+        if self._render_after_id is None:
+            self._render_after_id = self.root.after(35, self._render)
 
     def _font(self, size: int, bold: bool = False) -> ImageFont.ImageFont:
         candidates = (
