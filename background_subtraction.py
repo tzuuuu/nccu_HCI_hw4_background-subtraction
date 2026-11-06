@@ -163,7 +163,16 @@ class CameraMotionDetector:
             self.last_trigger_timestamp = monotonic_seconds
 
         active_zone = max(ratios, key=ratios.get) if max(ratios.values()) >= self.threshold * 0.6 else None
-        status = "Ready" if triggered_zone is None else "Triggered {}".format(triggered_zone)
+        if triggered_zone is not None:
+            status = "Triggered {}".format(triggered_zone)
+        elif active_zone is not None:
+            status = "Motion in {}".format(active_zone)
+        elif self.latched_zones:
+            status = "Release {}".format(sorted(self.latched_zones)[0])
+        elif monotonic_seconds - self.last_trigger_timestamp < self.cooldown_seconds:
+            status = "Cooldown"
+        else:
+            status = "Ready"
         return MotionSnapshot(frame, mask, ratios, active_zone, triggered_zone, trigger_ratio, status, self.frame_number)
 
     def release(self) -> None:

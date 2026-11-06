@@ -93,6 +93,15 @@ class TouchlessReaderApp:
         intro = ttk.Label(container, text="Camera preview and MOG2 foreground mask. Blue region outlines match the six reader zones.")
         intro.pack(anchor="w", pady=(4, 12))
 
+        guide = ttk.LabelFrame(container, text="快速蒐集指南", padding=8)
+        guide.pack(fill="x", pady=(0, 10))
+        guide_text = (
+            "1. 固定攝影機與光線；人在畫面中也可以，但背景學習時先保持靜止，按「Reset Background Model」。 "
+            "2. 等狀態顯示 Ready，確認靜止時各區 Motion ratio 接近低值。 "
+            "3. 每次只在一個 Zone 做動作，回到靜止並等 Ready 後再做下一筆。Pilot 沒記到動作時稍微降低門檻；靜止也誤觸時先穩定背景或稍微提高門檻。"
+        )
+        ttk.Label(guide, text=guide_text, wraplength=1060, justify="left").pack(anchor="w")
+
         preview_row = ttk.Frame(container)
         preview_row.pack(fill="both", expand=True)
         camera_col = ttk.LabelFrame(preview_row, text="Mirrored Camera Input")
@@ -225,12 +234,17 @@ class TouchlessReaderApp:
             for observer in list(self.snapshot_observers):
                 observer(snapshot)
             if snapshot.triggered_zone:
+                apply_command = (
+                    self.experiment_window is None
+                    or self.experiment_window.should_apply_reader_command()
+                )
                 command = COMMANDS[snapshot.triggered_zone]
                 trigger_time = time.monotonic()
                 for observer in list(self.trigger_observers):
                     observer(snapshot.triggered_zone, snapshot.trigger_ratio, trigger_time)
-                self.reader.execute_command(command)
-                if snapshot.triggered_zone not in self.saved_trigger_zones:
+                if apply_command:
+                    self.reader.execute_command(command)
+                if apply_command and snapshot.triggered_zone not in self.saved_trigger_zones:
                     self.saved_trigger_zones.add(snapshot.triggered_zone)
                     zone = snapshot.triggered_zone
                     self.root.after(100, lambda selected_zone=zone: self.capture_evidence("trigger-{}".format(selected_zone), "Camera trigger: {} {}".format(selected_zone, COMMAND_LABELS[COMMANDS[selected_zone]])))

@@ -167,6 +167,8 @@ class DocumentReaderUI:
 
         zone_rects = self._zone_rectangles(width, height)
         for zone, rect in zone_rects.items():
+            if zone in ("Z3", "Z4", "Z5", "Z6"):
+                continue
             triggered = self.triggered_zone == zone
             active = self.active_zone == zone
             fill = (37, 99, 235, 72 if triggered else 42 if active else 20)
@@ -176,6 +178,8 @@ class DocumentReaderUI:
         label_font = self._font(max(16, int(width * 0.017)), True)
         small_font = self._font(max(12, int(width * 0.011)))
         for zone, rect in zone_rects.items():
+            if zone in ("Z3", "Z4", "Z5", "Z6"):
+                continue
             x1, y1, x2, y2 = rect
             label = COMMAND_LABELS[COMMANDS[zone]]
             value = self.motion_ratios.get(zone, 0.0)
@@ -208,6 +212,28 @@ class DocumentReaderUI:
         toolbar_color = (255, 255, 255, 235) if not dark else (15, 23, 42, 245)
         draw.rectangle((0, toolbar_y, width, height), fill=toolbar_color)
         draw.line((0, toolbar_y, width, toolbar_y), fill=(37, 99, 235, 150), width=3)
+        toolbar_zones = ("Z3", "Z4", "Z5", "Z6")
+        for zone in toolbar_zones:
+            rect = zone_rects[zone]
+            x1, y1, x2, y2 = rect
+            triggered = self.triggered_zone == zone
+            active = self.active_zone == zone
+            fill = (37, 99, 235, 88 if triggered else 54 if active else 28)
+            outline = (37, 99, 235, 240 if triggered else 170 if active else 90)
+            draw.rectangle(rect, fill=fill, outline=outline, width=3 if triggered else 2)
+            command_label = COMMAND_LABELS[COMMANDS[zone]]
+            ratio_text = "Motion {:.1f}%".format(self.motion_ratios.get(zone, 0.0) * 100)
+            zone_text_font = self._font(max(12, int(width * 0.011)), True)
+            zone_tag = zone
+            tag_width = draw.textlength(zone_tag, font=small_font)
+            label_width = draw.textlength(command_label, font=zone_text_font)
+            ratio_width = draw.textlength(ratio_text, font=small_font)
+            ink = "#e2e8f0" if dark else "#334155"
+            muted_ink = "#cbd5e1" if dark else "#64748b"
+            draw.text(((x1 + x2 - tag_width) / 2, y1 + 10), zone_tag, font=small_font, fill=muted_ink)
+            draw.text(((x1 + x2 - label_width) / 2, y1 + 31), command_label, font=zone_text_font, fill=ink)
+            draw.text(((x1 + x2 - ratio_width) / 2, y1 + 51), ratio_text, font=small_font, fill=muted_ink)
+
         toolbar_labels = ("Zoom In  +", "Zoom Out  -", "Menu", "Settings")
         toolbar_font = self._font(max(15, int(width * 0.016)), True)
         for index, label in enumerate(toolbar_labels):

@@ -101,12 +101,18 @@ class ExperimentRecorder:
         self.results_dir.mkdir(parents=True, exist_ok=True)
         self.pilot_dir.mkdir(parents=True, exist_ok=True)
         self.experiment_path: Optional[Path] = None
-        self.pilot_path = self.pilot_dir / "pilot-motion-ratios.csv"
+        pilot_files = sorted(self.pilot_dir.glob("pilot-motion-ratios_*.csv"))
+        self.pilot_path = pilot_files[-1] if pilot_files else self.pilot_dir / "pilot-motion-ratios.csv"
 
     def start_experiment(self, experiment_id: str) -> Path:
         timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
         self.experiment_path = self.results_dir / "{}_{}.csv".format(experiment_id, timestamp)
         return self.experiment_path
+
+    def start_pilot(self) -> Path:
+        timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
+        self.pilot_path = self.pilot_dir / "pilot-motion-ratios_{}.csv".format(timestamp)
+        return self.pilot_path
 
     def record_trial(self, row: Dict[str, object]) -> None:
         if self.experiment_path is None:
@@ -173,6 +179,12 @@ class ExperimentRunnerWindow:
         self.timeout_after_id: Optional[str] = None
         self.session_started_at = ""
         self.saved_lighting_evidence = set()
+        self.prepared_lighting: Optional[str] = None
+        self.preparing_lighting: Optional[str] = None
+        self.awaiting_background_ready = False
+        self.ready_streak = 0
+        snapshot = self.app.last_snapshot
+        self.camera_ready = bool(snapshot and snapshot.frame_number > self.app.detector.warmup_frames and snapshot.status == "Ready")
 
         self.selection_var = tk.StringVar(value=self.EXPERIMENT_CHOICES[0][0])
         self.instruction_var = tk.StringVar(value="Pilot 不計入 75 次正式試驗。請先在正常光線下，以平常操作方式移動並觸發操作區；收集數值後再據此設定三組門檻。")
@@ -204,7 +216,7 @@ class ExperimentRunnerWindow:
         self.selection_box = ttk.Combobox(selection_row, textvariable=self.selection_var, values=[label for label, _code in self.EXPERIMENT_CHOICES], state="readonly", width=51)
         self.selection_box.pack(side="left", padx=(10, 12))
         self.selection_box.bind("<<ComboboxSelected>>", self._on_selection_change)
-        self.begin_button = ttk.Button(selection_row, text="開始流程", command=self.start_selected)
+        self.begin_button = ttk.Button(selection_row, text="開始 Pilot 收集", command=self.start_selected)
         self.begin_button.pack(side="left")
         ttk.Label(selection_row, text="單次試驗逾時").pack(side="left", padx=(18, 6))
         ttk.Spinbox(selection_row, from_=3, to=30, width=5, textvariable=self.timeout_value).pack(side="left")
@@ -233,13 +245,13 @@ class ExperimentRunnerWindow:
 
         controls = ttk.Frame(root_frame)
         controls.pack(fill="x")
-        self.trial_button = ttk.Button(controls, text="開始此試驗", command=self.start_trial, state="disabled")
+        self.prepare_button = ttk.Button(controls, text="準備光線條件並重設背景", command=self.prepare_condition)
+        self.prepare_button.pack(side="left")
+        self.prepare_button.pack_forget()
+        self.trial_button = ttk.Button(controls, text="我已準備好，開始計時", command=self.start_trial, state="disabled")
         self.trial_button.pack(side="left")
         self.stop_button = ttk.Button(controls, text="停止流程", command=self.stop_session, state="disabled")
         self.stop_button.pack(side="left", padx=8)
-        ttk.Button(controls, text="停止 Pilot", command=self.stop_pilot).pack(side="right")
-        self.pilot_button = ttk.Button(controls, text="開始 Pilot 收集", command=self.start_pilot)
-        self.pilot_button.pack(side="right", padx=(0, 8))
 
         ttk.Label(root_frame, textvariable=self.progress_var, font=("Arial", 11, "bold")).pack(anchor="w", pady=(14, 5))
         ttk.Label(root_frame, textvariable=self.status_var, wraplength=900, justify="left").pack(anchor="w")
@@ -255,12 +267,13 @@ class ExperimentRunnerWindow:
         elif mode == "experiment2":
             self.instruction_var.set("固定正常光線，依序使用 Pilot 推導的 Low、Medium、High 門檻。每個代表指令各測三次，共 27 次。開始前須填入由低至高的三個 motion ratio (%)。")
         else:
-            self.instruction_var.set("依提示分別在正常與昏暗光線操作 Previous、Next、Zoom In，各三次，共 18 次。光線變更後先重設背景模型、等待穩定，再開始該試驗。")
+            self.instruction_var.set("每個條件會先顯示在「目前試驗」。先調整為該光線，再按「準備光線條件並重設背景」；保持不動直到背景狀態 Ready，最後按「我已準備好，開始計時」。計時只從最後一步開始。共 18 次。")
         self.refresh_state()
 
     def start_selected(self) -> None:
         if self.pilot_active:
             self.stop_pilot()
+            return
         experiment_id = self.choice_by_label.get(self.selection_var.get(), "pilot")
         if experiment_id == "pilot":
             self.start_pilot()
@@ -291,6 +304,9 @@ class ExperimentRunnerWindow:
         self.active_experiment_name = self.trials[0].experiment_name
         self.session_baseline_threshold = baseline
         self.threshold_levels = levels or {}
+        self.prepared_lighting = "Normal Lighting" if experiment_id != "experiment3" else None
+        self.preparing_lighting = None
+        self.awaiting_background_ready = False
         self.session_started_at = datetime.now().astimezone().isoformat(timespec="seconds")
         self.completed_count = 0
         self.session_total = len(self.trials)
@@ -300,10 +316,45 @@ class ExperimentRunnerWindow:
         output_path = self.recorder.start_experiment(experiment_id)
         self.output_var.set("記錄檔：{}".format(output_path))
         self.app.set_experiment_threshold_lock(True)
-        self.trial_var.set("準備開始：{} 次試驗".format(len(self.trials)))
-        self.condition_var.set("正式實驗開始後，依序按「開始此試驗」。")
-        self.status_var.set("排程已建立；未開始的動作不會記入試驗資料。")
+        self._show_pending_trial()
         self._update_progress()
+        self.refresh_state()
+
+    def _show_pending_trial(self) -> None:
+        if not self.trials:
+            return
+        trial = self.trials[0]
+        if self.active_experiment_id and self.app.detector.threshold != trial.threshold_value:
+            self.app.apply_experiment_threshold(trial.threshold_value)
+        trial_number = self.completed_count + 1
+        self.trial_var.set("待開始 {} / {}  |  目標：{} ({})".format(trial_number, self.session_total, trial.target_zone, COMMAND_LABELS[trial.target_command]))
+        if trial.experiment_id == "experiment2":
+            threshold_label = "門檻 {} = {:.2f}%".format(trial.threshold_level, trial.threshold_value * 100)
+        else:
+            threshold_label = "固定門檻 {:.2f}%".format(trial.threshold_value * 100)
+        self.condition_var.set("條件：{}  |  {}  |  第 {} 次重複".format(trial.lighting, threshold_label, trial.repetition))
+
+        if trial.experiment_id == "experiment3" and self.prepared_lighting != trial.lighting:
+            if self.awaiting_background_ready:
+                self.status_var.set("正在準備 {}：請保持攝影機畫面靜止；顯示 Ready 後才會開始計時。".format(trial.lighting))
+            else:
+                self.status_var.set("步驟 1：把環境調成 {}，再按「準備光線條件並重設背景」。這一步不會開始計時。".format(trial.lighting))
+        elif not self.camera_ready:
+            self.status_var.set("相機尚未 Ready。請保持畫面靜止，等診斷視窗顯示 Ready 後再開始計時。")
+        else:
+            self.status_var.set("條件已顯示。確認環境與目標區準備好後，按「我已準備好，開始計時」。")
+
+    def prepare_condition(self) -> None:
+        if self.active_experiment_id != "experiment3" or not self.trials or self.active_trial is not None:
+            return
+        lighting = self.trials[0].lighting
+        self.preparing_lighting = lighting
+        self.prepared_lighting = None
+        self.awaiting_background_ready = True
+        self.camera_ready = False
+        self.ready_streak = 0
+        self.app.reset_background()
+        self._show_pending_trial()
         self.refresh_state()
 
     def start_trial(self) -> None:
@@ -311,6 +362,15 @@ class ExperimentRunnerWindow:
             return
         if not self.trials:
             self._finish_session()
+            return
+        if not self.camera_ready:
+            self.status_var.set("相機還未 Ready；請保持畫面靜止，待背景模型穩定後再開始。")
+            self.refresh_state()
+            return
+        pending = self.trials[0]
+        if pending.experiment_id == "experiment3" and self.prepared_lighting != pending.lighting:
+            self.status_var.set("請先準備 {} 光線條件並等待背景模型穩定。".format(pending.lighting))
+            self.refresh_state()
             return
 
         self.active_trial = self.trials.pop(0)
@@ -337,9 +397,25 @@ class ExperimentRunnerWindow:
         self.timeout_after_id = self.window.after(timeout_seconds * 1000, self._timeout_trial)
 
     def _on_snapshot(self, snapshot) -> None:
-        if self.active_trial is None:
-            return
-        self.max_target_motion = max(self.max_target_motion, snapshot.motion_ratios.get(self.active_trial.target_zone, 0.0))
+        if self.active_trial is not None:
+            self.max_target_motion = max(self.max_target_motion, snapshot.motion_ratios.get(self.active_trial.target_zone, 0.0))
+
+        ready_candidate = (
+            snapshot.frame_number > self.app.detector.warmup_frames
+            and snapshot.status == "Ready"
+        )
+        self.ready_streak = self.ready_streak + 1 if ready_candidate else 0
+        camera_ready = self.ready_streak >= 6
+        if camera_ready != self.camera_ready:
+            self.camera_ready = camera_ready
+            if self.awaiting_background_ready and camera_ready:
+                self.prepared_lighting = self.preparing_lighting
+                self.preparing_lighting = None
+                self.awaiting_background_ready = False
+                self._show_pending_trial()
+            elif self.active_trial is None and self.trials:
+                self._show_pending_trial()
+            self.refresh_state()
 
     def _on_trigger(self, zone: str, ratio: float, trigger_time: float) -> None:
         if self.active_trial is not None:
@@ -352,6 +428,10 @@ class ExperimentRunnerWindow:
             self.recorder.record_pilot(zone, ratio, self.app.detector.threshold)
             self.pilot_summary_var.set("Pilot 樣本數：{}  |  最近 motion ratio：{:.2f}%".format(len(self.pilot_values), ratio * 100))
             self.status_var.set("已記錄 Pilot：{} / {}，motion ratio {:.2f}%。繼續收集正常操作樣本。".format(zone, COMMAND_LABELS[COMMANDS[zone]], ratio * 100))
+
+    def should_apply_reader_command(self) -> bool:
+        """Ignore movements between trials so condition setup cannot page the reader."""
+        return self.active_experiment_id is None or self.active_trial is not None
 
     def _timeout_trial(self) -> None:
         self.timeout_after_id = None
@@ -410,8 +490,7 @@ class ExperimentRunnerWindow:
         if not self.trials:
             self._finish_session()
         else:
-            self.trial_var.set("下一個：{}  |  {} ({})".format(self.trials[0].trial_id, self.trials[0].target_zone, COMMAND_LABELS[self.trials[0].target_command]))
-            self.condition_var.set("條件：{}  |  {}".format(self.trials[0].lighting, self.trials[0].threshold_level))
+            self._show_pending_trial()
             self.refresh_state()
 
     def _update_progress(self) -> None:
@@ -429,6 +508,9 @@ class ExperimentRunnerWindow:
         self.active_experiment_name = ""
         self.trials = []
         self.active_trial = None
+        self.awaiting_background_ready = False
+        self.preparing_lighting = None
+        self.prepared_lighting = None
         self.app.apply_experiment_threshold(self.session_baseline_threshold, unlock=True)
         rate = (100.0 * self.correct_count / self.completed_count) if self.completed_count else 0.0
         self.trial_var.set("{} 流程完成".format(experiment_name))
@@ -445,6 +527,9 @@ class ExperimentRunnerWindow:
         self.active_trial = None
         self.trials = []
         self.active_experiment_id = None
+        self.awaiting_background_ready = False
+        self.preparing_lighting = None
+        self.prepared_lighting = None
         self.app.apply_experiment_threshold(self.session_baseline_threshold, unlock=True)
         self.status_var.set("流程已停止；已完成試驗已保存在 CSV，未開始的試驗未記錄。")
         self.trial_var.set("流程已停止")
@@ -456,7 +541,8 @@ class ExperimentRunnerWindow:
             return
         self.pilot_active = True
         self.pilot_values = []
-        self.pilot_summary_var.set("Pilot 樣本數：0  |  資料會附加至 {}".format(self.recorder.pilot_path.name))
+        pilot_path = self.recorder.start_pilot()
+        self.pilot_summary_var.set("Pilot 樣本數：0  |  本次資料：{}".format(pilot_path.name))
         self.status_var.set("Pilot 收集中。請在正常光線下做自然操作；每次相機觸發都會記錄 motion ratio。")
         self.refresh_state()
 
@@ -502,9 +588,27 @@ class ExperimentRunnerWindow:
         pilot = self.pilot_active
         self.selection_box.configure(state="disabled" if active or pilot else "readonly")
         self.begin_button.configure(state="disabled" if active else "normal")
-        self.trial_button.configure(state="normal" if active and self.active_trial is None and self.trials else "disabled")
+        if pilot:
+            self.begin_button.configure(text="停止 Pilot 收集", command=self.stop_pilot, state="normal")
+        else:
+            mode = self.choice_by_label.get(self.selection_var.get(), "pilot")
+            button_label = "開始 Pilot 收集" if mode == "pilot" else "開始正式流程"
+            self.begin_button.configure(text=button_label, command=self.start_selected, state="disabled" if active else "normal")
+        if self.active_experiment_id == "experiment3":
+            if not self.prepare_button.winfo_manager():
+                self.prepare_button.pack(side="left", before=self.trial_button)
+        else:
+            self.prepare_button.pack_forget()
+
+        pending_trial = self.trials[0] if active and self.active_trial is None and self.trials else None
+        needs_prepare = bool(pending_trial and pending_trial.experiment_id == "experiment3" and self.prepared_lighting != pending_trial.lighting)
+        prepare_enabled = bool(active and pending_trial and needs_prepare and not self.awaiting_background_ready)
+        self.prepare_button.configure(state="normal" if prepare_enabled else "disabled")
+        self.trial_button.configure(
+            text="我已準備好，開始計時" if self.camera_ready else "等待背景穩定…",
+            state="normal" if active and pending_trial and not needs_prepare and self.camera_ready else "disabled",
+        )
         self.stop_button.configure(state="normal" if active else "disabled")
-        self.pilot_button.configure(state="disabled" if active or pilot else "normal")
         for entry in self.threshold_entries.values():
             entry.configure(state="disabled" if active else "normal")
 

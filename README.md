@@ -17,16 +17,17 @@ pip install -r requirements.txt
 python app.py
 ```
 
-啟動後會開啟 Document Reader 與攝影機診斷視窗。允許攝影機權限後，讓鏡頭拍到穩定背景並等待背景模型完成學習。診斷視窗會同時顯示攝影機影像、前景遮罩、六區變化比例與門檻控制。使用者在鏡頭影像中對應的操作區移動，即可觸發閱讀器指令。
+啟動後會開啟 Document Reader 與攝影機診斷視窗。允許攝影機權限後，讓鏡頭拍到穩定背景並等待背景模型完成學習。診斷視窗會同時顯示攝影機影像、前景遮罩、六區變化比例與門檻控制。使用者在鏡頭影像中對應的操作區移動，即可觸發閱讀器指令。完整的設定與資料蒐集步驟請見 [`DATA_COLLECTION_GUIDE.md`](DATA_COLLECTION_GUIDE.md)。
 
 ## 操作與實驗流程
 
-1. 確認閱讀器顯示 8 頁文件、相機診斷視窗顯示六個 Zone。MOG2 初次學習約需 1–2 秒；背景穩定後再操作。
-2. 從「Experiment → Open Experiment Runner」開啟實驗工具。先選 Pilot，在正常光線下做幾次日常幅度的操作，收集 motion ratio。
-3. 停止 Pilot，使用第 25、50、75 百分位數作為 Low、Medium、High 的建議值。檢視三個值並確認由低至高，再開始 Experiment 2。Experiment 1 和 3 使用開始流程時的固定門檻。
-4. 每次依 Experiment Runner 顯示的目標區開始操作。觸發後自動記錄；逾時會記為漏觸。正式流程期間會固定連續影格數與冷卻時間，Experiment 2 只改變門檻。Experiment 3 切換光線後，先按「Reset Background Model」，等待背景重新穩定，再開始該試驗。
-5. 每筆正式試驗完成後會立即寫入獨立 CSV：`results/experiment1_*.csv`、`results/experiment2_*.csv`、`results/experiment3_*.csv`。Pilot 資料寫入 `pilot-data/pilot-motion-ratios.csv`。
-6. 完成實驗後執行 `python analyze_results.py`，或指定一個以上的實驗 CSV；需要另存摘要時加上 `--output results/summary.md`。
+1. 在診斷視窗完成相機、背景與門檻設定；預設 K = 3、Cooldown = 1 秒、初始 motion ratio 門檻 = 2.5%。
+2. 從「Experiment → Open Experiment Runner」開啟實驗工具。先選 Pilot，在正常光線下收集實際觸發 motion ratio。
+3. 停止 Pilot，檢視第 25、50、75 百分位門檻建議值；選好正式實驗的固定基準門檻後，再開始 Experiment 1、2、3。
+4. Runner 會先顯示下一筆的目標與條件。Experiment 3 需先切換光線並按「準備光線條件並重設背景」，等診斷狀態 Ready，再按「我已準備好，開始計時」；正式試驗的 8 秒計時不包含準備時間。
+5. 正式流程期間會固定 K 與 Cooldown，Experiment 2 只改變門檻。每筆觸發後自動記錄；逾時會記為漏觸。
+6. 每筆正式試驗完成後會立即寫入獨立 CSV：`results/experiment1_*.csv`、`results/experiment2_*.csv`、`results/experiment3_*.csv`。每次 Pilot 寫入獨立的 `pilot-data/pilot-motion-ratios_*.csv`。
+7. 完成實驗後執行 `python analyze_results.py`，或指定一個以上的實驗 CSV；需要另存摘要時加上 `--output results/summary.md`。
 
 首次觸發各 Zone、正常／昏暗光線條件及誤觸／漏觸時，程式會在 `screenshots/` 自動儲存證據圖。完整介面與前景遮罩也可由視窗按鈕手動儲存。
 
@@ -41,5 +42,6 @@ python app.py
 - `results/`、`pilot-data/`：執行後建立的實驗資料 CSV，可納入作業版本紀錄。
 - `screenshots/`：介面、前景遮罩及實驗條件截圖。
 - `REPORT_TEMPLATE.md`：作業報告架構與填寫提示。
+- `DATA_COLLECTION_GUIDE.md`：相機設定、門檻選擇與三組實驗逐步操作方式。
 
 本作業只使用 Background Subtraction 判斷各區域前景變化，不使用 Hand Detection、Hand Landmark 或 Skin Segmentation。
