@@ -1,5 +1,7 @@
 # HW4 — Vision-Based UI using Background Subtraction
 
+完整作業報告見 [`REPORT.md`](REPORT.md)，包含系統原理、介面截圖、實驗設計、實際數據圖表與結果討論。
+
 以 OpenCV 背景減除實作免持文件閱讀器。系統依攝影機畫面中六個 Hot Zones 的前景變化比例觸發閱讀指令；不使用手部偵測或手部關鍵點。
 
 ## 環境需求
