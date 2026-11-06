@@ -1,0 +1,10 @@
+{
+  "total_trials": 105,
+  "sources": {
+    "hand": "experiment1_20261106-全部用手.csv",
+    "mixed": "experiment1_20261106-z1z2使用頭_z3z4z5z6使用手.csv",
+    "threshold": "experiment2_20261106-z1z2使用頭_z3z4z5z6使用手.csv",
+    "lighting": "experiment3_20261106-z1z2使用頭_z3z4z5z6使用手.csv"
+  },
+  "checks": "row counts, unique trial IDs per source, balanced cells, outcome flags, correct-zone agreement, missing-time semantics passed"
+}

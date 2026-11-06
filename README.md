@@ -33,6 +33,8 @@ python app.py
 
 ## 專案內容
 
+四份實際試驗資料的結果與討論見 [`results/analysis/RESULTS_ANALYSIS.md`](results/analysis/RESULTS_ANALYSIS.md)。該資料夾含四組 PNG／SVG 圖表與指標摘要 CSV。重現方式：先執行 `pip install -r requirements-analysis.txt`，再執行 `python analyze_experiments.py`。
+
 - `HW4_Background_Subtraction_Experiment_Plan.md`：作業目標、三組實驗與報告要求。
 - `Touchless_Document_Reader_UI.md`：HW4 / HW5 共用的操作介面規格。
 - `assets/pages/`：閱讀器使用的 8 張文件頁面圖片。

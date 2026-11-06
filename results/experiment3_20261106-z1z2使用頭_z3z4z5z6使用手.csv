@@ -1,0 +1,19 @@
+﻿trial_id,experiment,condition,lighting,threshold_level,threshold_value,target_zone,target_command,triggered_zone,triggered_command,correct,motion_ratio,trigger_time_ms,false_trigger,missed_trigger,repetition,notes,started_at,completed_at
+E3-001,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z3,Zoom In,Z3,Zoom In,true,0.106309,589.5,false,false,1,,2026-11-06T15:48:48+08:00,2026-11-06T15:48:48+08:00
+E3-002,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z1,Previous Page,Z2,Next Page,false,0.091594,997.4,true,false,2,,2026-11-06T15:48:56+08:00,2026-11-06T15:48:57+08:00
+E3-003,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z1,Previous Page,Z2,Next Page,false,0.088419,781.5,true,false,1,,2026-11-06T15:49:09+08:00,2026-11-06T15:49:09+08:00
+E3-004,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z1,Previous Page,Z2,Next Page,false,0.095563,1130.8,true,false,3,,2026-11-06T15:49:33+08:00,2026-11-06T15:49:34+08:00
+E3-005,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z3,Zoom In,Z3,Zoom In,true,0.203715,1395.9,false,false,2,,2026-11-06T15:49:38+08:00,2026-11-06T15:49:39+08:00
+E3-006,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z2,Next Page,Z2,Next Page,true,0.071282,1395.3,false,false,2,,2026-11-06T15:49:43+08:00,2026-11-06T15:49:44+08:00
+E3-007,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z2,Next Page,Z2,Next Page,true,0.082913,1869.5,false,false,1,,2026-11-06T15:49:52+08:00,2026-11-06T15:49:53+08:00
+E3-008,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z2,Next Page,Z2,Next Page,true,0.085002,2381.5,false,false,3,,2026-11-06T15:49:56+08:00,2026-11-06T15:49:59+08:00
+E3-009,Experiment 3 - Lighting,Dim Lighting,Dim Lighting,Baseline,0.055961,Z3,Zoom In,Z3,Zoom In,true,0.377948,1054.7,false,false,3,,2026-11-06T15:50:05+08:00,2026-11-06T15:50:06+08:00
+E3-010,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z3,Zoom In,Z3,Zoom In,true,0.085083,1455.6,false,false,3,,2026-11-06T15:50:36+08:00,2026-11-06T15:50:37+08:00
+E3-011,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z1,Previous Page,Z1,Previous Page,true,0.115742,1373.7,false,false,1,,2026-11-06T15:50:40+08:00,2026-11-06T15:50:41+08:00
+E3-012,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z3,Zoom In,Z3,Zoom In,true,0.154422,1128.2,false,false,1,,2026-11-06T15:50:46+08:00,2026-11-06T15:50:47+08:00
+E3-013,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z2,Next Page,Z2,Next Page,true,0.106559,947.6,false,false,1,,2026-11-06T15:50:49+08:00,2026-11-06T15:50:50+08:00
+E3-014,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z1,Previous Page,Z1,Previous Page,true,0.096700,952.9,false,false,3,,2026-11-06T15:50:53+08:00,2026-11-06T15:50:54+08:00
+E3-015,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z2,Next Page,Z2,Next Page,true,0.086664,1581.1,false,false,2,,2026-11-06T15:50:58+08:00,2026-11-06T15:51:00+08:00
+E3-016,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z1,Previous Page,Z1,Previous Page,true,0.102231,759.1,false,false,2,,2026-11-06T15:51:03+08:00,2026-11-06T15:51:04+08:00
+E3-017,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z3,Zoom In,Z3,Zoom In,true,0.387028,947.6,false,false,2,,2026-11-06T15:51:07+08:00,2026-11-06T15:51:08+08:00
+E3-018,Experiment 3 - Lighting,Normal Lighting,Normal Lighting,Baseline,0.055961,Z2,Next Page,Z2,Next Page,true,0.092330,927.6,false,false,3,,2026-11-06T15:51:10+08:00,2026-11-06T15:51:11+08:00
